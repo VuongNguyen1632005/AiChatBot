@@ -1,25 +1,14 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from sqlalchemy import text  # Thêm dòng này để tạo câu lệnh test SQL
 from app.core.config import settings
 from app.db.mongodb.session import db_mongo
-from app.db.postgresql.session import engine  # Import engine của Postgres vào đây
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ---- THỬ KẾT NỐI POSTGRESQL ----
-    try:
-        async with engine.connect() as connection:
-            # Chạy thử một câu lệnh SQL đơn giản để test kết nối
-            await connection.execute(text("SELECT 1"))
-        print("🚀 Kết nối thành công tới PostgreSQL qua Docker!")
-    except Exception as e:
-        print(f"❌ Lỗi kết nối PostgreSQL: {e}")
-
-    # ---- THỬ KẾT NỐI MONGODB ----
+    # Khởi chạy kết nối MongoDB khi Server bắt đầu Start up
     try:
         db_mongo.connect_to_database()
-        print("🚀 Kết nối thành công tới MongoDB qua Docker!")
+        print("🚀 Đã kết nối tới MongoDB thành công!")
     except Exception as e:
         print(f"❌ Lỗi kết nối MongoDB: {e}")
         
@@ -30,6 +19,14 @@ async def lifespan(app: FastAPI):
     print("🛑 Đã đóng kết nối MongoDB.")
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
+# Đăng ký các router chính thức của phiên bản v1 (Prefix: /api/v1)
+from app.api.v1.router import api_router
+app.include_router(api_router, prefix="/api/v1")
+
+# Đăng ký trực tiếp router users lên root để hỗ trợ chuẩn endpoint GET /users/system-status
+from app.api.v1.endpoints.users import router as users_router
+app.include_router(users_router, prefix="/users", tags=["users"])
 
 @app.get("/")
 async def root():
