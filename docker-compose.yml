@@ -1,0 +1,38 @@
+services:
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: fastapi_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: my_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:latest
+    container_name: fastapi_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  web:
+    build: .
+    container_name: fastapi_web
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres_db:5432/my_database
+      - MONGODB_URL=mongodb://mongodb:27017/ai_chatbot
+    depends_on:
+      - postgres_db
+      - mongodb
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:
+  mongodb_data:
