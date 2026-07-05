@@ -50,3 +50,17 @@ class LoginResponseData(BaseModel):
     accessToken: str = Field(..., description="Access Token (JWT)")
     refreshToken: str = Field(..., description="Refresh Token (JWT)")
     user: LoginResponseUser = Field(..., description="Thông tin người dùng")
+
+class ForgotPasswordRequest(BaseModel):
+    """
+    Schema yêu cầu đặt lại mật khẩu.
+    """
+    email: EmailStr = Field(..., description="Email của tài khoản cần lấy lại mật khẩu")
+
+class ForgotPasswordResponse(BaseModel):
+    """
+    Dữ liệu trả về sau khi gửi OTP đặt lại mật khẩu thành công.
+    """
+    email: EmailStr = Field(..., description="Email nhận mã OTP")
+    otpSent: bool = Field(..., description="Trạng thái đã gửi OTP")
+    expiredIn: int = Field(..., description="Thời gian hết hạn của OTP tính bằng giây (ví dụ: 300)")
