@@ -19,6 +19,14 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  redis:
+    image: redis:7-alpine
+    container_name: fastapi_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   web:
     build: .
     container_name: fastapi_web
@@ -27,12 +35,15 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres_db:5432/my_database
       - MONGODB_URL=mongodb://mongodb:27017/ai_chatbot
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - postgres_db
       - mongodb
+      - redis
     volumes:
       - .:/app
 
 volumes:
   postgres_data:
   mongodb_data:
+  redis_data:
