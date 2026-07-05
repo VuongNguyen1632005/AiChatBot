@@ -53,8 +53,88 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# --- Đăng ký Exception Handlers toàn cục ---
+from fastapi import Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from datetime import datetime, timezone
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Bắt lỗi Validation từ Pydantic và định dạng lại theo cấu trúc chuẩn.
+    """
+    errors_list = []
+    for error in exc.errors():
+        field = error.get("loc")[-1] if error.get("loc") else None
+        message = error.get("msg", "Dữ liệu không hợp lệ")
+        
+        # Làm sạch thông báo lỗi của Pydantic custom validators
+        if message.startswith("Value error, "):
+            message = message[len("Value error, "):]
+            
+        errors_list.append({
+            "field": str(field) if field else None,
+            "message": message
+        })
+        
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "message": "Dữ liệu không hợp lệ",
+            "data": None,
+            "errors": errors_list,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        }
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """
+    Bắt lỗi HTTPException của FastAPI và trả về chuẩn JSON của ETECHS.
+    """
+    errors_list = None
+    if isinstance(exc.detail, list):
+        errors_list = exc.detail
+        message = "Dữ liệu không hợp lệ"
+    elif isinstance(exc.detail, dict):
+        errors_list = [exc.detail]
+        message = exc.detail.get("message", "Đã xảy ra lỗi")
+    else:
+        message = str(exc.detail)
+        
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "message": message,
+            "data": None,
+            "errors": errors_list,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """
+    Bắt các lỗi hệ thống không kiểm soát (500) và trả về thông báo an toàn.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "message": "Lỗi hệ thống nội bộ",
+            "data": None,
+            "errors": [{"field": None, "message": str(exc)}],
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        }
+    )
+
 # Đăng ký các router chính thức của phiên bản v1 (Prefix: /api/v1)
 from app.api.v1.router import api_router
+
 app.include_router(api_router, prefix="/api/v1")
 
 # Đăng ký trực tiếp router users lên root để hỗ trợ chuẩn endpoint GET /users/system-status
