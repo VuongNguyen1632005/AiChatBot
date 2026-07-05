@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.config import settings
 from app.db.mongodb.session import db_mongo
+from app.db.redis.session import init_redis, close_redis
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -12,11 +13,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Lỗi kết nối MongoDB: {e}")
         
+    # Khởi chạy kết nối Redis
+    await init_redis()
+        
     yield
     
     # Khởi chạy khi Server đóng (Shutdown)
     db_mongo.close_database_connection()
     print("🛑 Đã đóng kết nối MongoDB.")
+    
+    # Đóng kết nối Redis
+    await close_redis()
 
 tags_metadata = [
     {

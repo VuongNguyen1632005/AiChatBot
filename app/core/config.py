@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Exam Generator Backend"
     MONGODB_URL: str = "mongodb://localhost:27017"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/my_database"
+    REDIS_URL: str = "redis://localhost:6379/0"
     GEMINI_API_KEY: str = ""
     
     # Auth & Security
