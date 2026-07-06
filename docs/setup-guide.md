@@ -21,13 +21,19 @@ Sao chép file cấu hình mẫu `.env.example` thành file `.env` thực tế:
 cp .env.example .env
 ```
 
-Mở file `.env` và chỉnh sửa các giá trị kết nối cơ sở dữ liệu và API Key nếu cần:
+Mở file `.env` và chỉnh sửa các giá trị cấu hình nếu cần:
 ```env
 # URL kết nối PostgreSQL (sử dụng asyncpg bất đồng bộ)
 DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/my_database
 
 # URL kết nối MongoDB
 MONGODB_URL=mongodb://localhost:27017/ai_chatbot
+
+# URL kết nối Redis
+REDIS_URL=redis://localhost:6379/0
+
+# URL của ứng dụng Frontend (phục vụ sinh liên kết xác thực email)
+FRONTEND_URL=http://localhost:3000
 
 # API Key cho các mô hình ngôn ngữ lớn (Gemini AI)
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -56,10 +62,10 @@ Khi chạy bằng Docker, toàn bộ mã nguồn FastAPI và các cơ sở dữ 
 ### Cách 2: Khởi chạy thủ công ở Local (Chỉ khi không bị Windows chặn)
 Nếu bạn không muốn chạy FastAPI qua Docker mà muốn debug trực tiếp ở local:
 
-1. **Khởi chạy riêng PostgreSQL và MongoDB bằng Docker (chỉ chạy Database):**
-   Mở file `docker-compose.yml` và tắt/comment phần dịch vụ `web`, sau đó khởi động:
+1. **Khởi chạy riêng PostgreSQL, MongoDB và Redis bằng Docker (chỉ chạy Database):**
+   Khởi động các container cơ sở dữ liệu:
    ```bash
-   docker compose up -d postgres_db mongodb
+   docker compose up -d postgres_db mongodb redis
    ```
 2. **Cài đặt thư viện và khởi tạo môi trường ảo (Virtualenv):**
    ```bash
@@ -119,6 +125,16 @@ Phản hồi mong muốn khi kết nối hoàn toàn thông suốt:
   },
   "errors": null
 }
+```
+
+---
+
+## 🧪 Hướng dẫn chạy thử nghiệm tự động (Unit Tests)
+Dự án tích hợp sẵn bộ kiểm thử tự động sử dụng `pytest` để kiểm tra hoạt động của toàn bộ logic nghiệp vụ (Xác thực, OTP, Đăng ký, Kích hoạt Email, Đặt lại mật khẩu...).
+
+Để chạy toàn bộ các bài kiểm thử:
+```bash
+uv run pytest
 ```
 
 ---
