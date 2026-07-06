@@ -2,11 +2,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse
+from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse
 from app.db.redis.session import get_redis
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException
 from app.db.mongodb.session import db_mongo
-from app.utils.email_sender import send_otp_email
+from app.utils.email_sender import send_otp_email, send_password_changed_email
 import secrets
 from datetime import datetime, timezone, timedelta
 
@@ -203,4 +203,63 @@ class AuthService:
         return VerifyOTPResponse(
             verified=True,
             resetToken=reset_token
+        )
+
+    @staticmethod
+    async def reset_password(db: AsyncSession, reset_token: str, new_password: str) -> ResetPasswordResponse:
+        """
+        Đặt lại mật khẩu mới:
+        1. Lấy email từ Redis bằng key: reset_token:{resetToken}
+        2. Nếu không tồn tại -> raise ResetTokenInvalidException()
+        3. Xóa resetToken khỏi Redis ngay lập tức (one-time use)
+        4. Tìm user theo email trong PostgreSQL.
+        5. Nếu không thấy -> raise ResetTokenInvalidException()
+        6. Mã hóa mật khẩu mới bằng hash_password().
+        7. Cập nhật mật khẩu trong PostgreSQL (UserRepository.update_password).
+        8. Gửi email thông báo đổi mật khẩu thành công.
+        9. Trả về ResetPasswordResponse.
+        """
+        redis_cli = await get_redis()
+        if not redis_cli:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Dịch vụ Redis không hoạt động"
+            )
+
+        reset_token_key = f"reset_token:{reset_token}"
+
+        # 1. Lấy email từ Redis
+        email = await redis_cli.get(reset_token_key)
+        if not email:
+            raise ResetTokenInvalidException()
+
+        # 2. Xóa resetToken khỏi Redis ngay lập tức (One-time use) để tránh brute-force thử lại
+        await redis_cli.delete(reset_token_key)
+
+        # 3. Tìm user trong PostgreSQL
+        user = await UserRepository.get_by_email(db, email)
+        if not user:
+            raise ResetTokenInvalidException()
+
+        # 4. Mã hóa mật khẩu mới
+        hashed_password = hash_password(new_password)
+
+        # 5. Cập nhật mật khẩu trong PostgreSQL
+        try:
+            await UserRepository.update_password(db, email, hashed_password)
+        except Exception as e:
+            print(f"❌ Lỗi cập nhật mật khẩu trong PostgreSQL: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Lỗi cập nhật cơ sở dữ liệu"
+            )
+
+        # 6. Ghi log audit bảo mật (không ghi đè mật khẩu)
+        print(f"📝 [AUDIT] Người dùng {email} đã đặt lại mật khẩu thành công bằng resetToken vào lúc {datetime.now(timezone.utc)}")
+
+        # 7. Gửi email thông báo đổi mật khẩu thành công
+        await send_password_changed_email(email)
+
+        return ResetPasswordResponse(
+            resetSuccess=True
         )

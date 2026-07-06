@@ -43,3 +43,43 @@ Trân trọng,
 
     # Thực thi đồng bộ _send trong một worker thread để không block event loop của FastAPI
     await asyncio.to_thread(_send)
+
+
+async def send_password_changed_email(email: str) -> None:
+    """
+    Gửi email thông báo đổi mật khẩu thành công (non-blocking).
+    """
+    if not all([settings.MAIL_SERVER, settings.MAIL_USERNAME, settings.MAIL_PASSWORD]):
+        print(f"\n==========================================")
+        print(f"📧 [EMAIL MOCK] Thông báo đổi mật khẩu thành công gửi đến {email}")
+        print(f"==========================================\n")
+        return
+
+    def _send():
+        msg = MIMEMultipart()
+        msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+        msg["To"] = email
+        msg["Subject"] = "Thông báo: Mật khẩu của bạn đã được thay đổi"
+        
+        body = f"""Chào bạn,
+
+Mật khẩu cho tài khoản {email} của bạn vừa được thay đổi thành công.
+
+Nếu không phải bạn thực hiện thay đổi này, vui lòng liên hệ ngay với chúng tôi để bảo vệ tài khoản.
+
+Trân trọng,
+Đội ngũ phát triển.
+"""
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        
+        # Tạo kết nối SMTP
+        server = smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT)
+        try:
+            server.starttls()
+            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+            server.sendmail(msg["From"], email, msg.as_string())
+        finally:
+            server.quit()
+
+    # Thực thi đồng bộ _send trong một worker thread để không block event loop của FastAPI
+    await asyncio.to_thread(_send)

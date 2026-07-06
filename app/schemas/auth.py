@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, EmailStr, Field, field_validator, ValidationInfo, model_validator
 from typing import Optional
 
 class RegisterRequest(BaseModel):
@@ -92,3 +92,45 @@ class VerifyOTPErrorResponse(BaseModel):
     verified: bool = Field(False, description="Trạng thái xác thực thất bại")
     error_code: str = Field(..., description="Mã lỗi xác thực")
     message: str = Field(..., description="Thông điệp chi tiết lỗi")
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Schema yêu cầu đặt lại mật khẩu mới.
+    """
+    resetToken: str = Field(..., description="Token xác thực để đặt lại mật khẩu")
+    newPassword: str = Field(..., description="Mật khẩu mới")
+    confirmPassword: str = Field(..., description="Xác nhận mật khẩu mới")
+
+    @model_validator(mode="after")
+    def validate_password_and_match(self) -> 'ResetPasswordRequest':
+        # 1. Kiểm tra độ dài tối thiểu 8 ký tự
+        if len(self.newPassword) < 8:
+            raise ValueError("Mật khẩu phải có ít nhất 8 ký tự")
+            
+        # 2. Kiểm tra độ mạnh mật khẩu (1 chữ hoa, 1 chữ thường, 1 số)
+        if not any(c.isupper() for c in self.newPassword):
+            raise ValueError("Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số")
+        if not any(c.islower() for c in self.newPassword):
+            raise ValueError("Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số")
+        if not any(c.isdigit() for c in self.newPassword):
+            raise ValueError("Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số")
+            
+        # 3. Kiểm tra trùng khớp mật khẩu xác nhận
+        if self.newPassword != self.confirmPassword:
+            raise ValueError("Mật khẩu xác nhận không khớp")
+            
+        return self
+
+class ResetPasswordResponse(BaseModel):
+    """
+    Dữ liệu trả về khi đặt lại mật khẩu thành công.
+    """
+    resetSuccess: bool = Field(True, description="Trạng thái đặt lại mật khẩu thành công")
+
+class ResetPasswordErrorResponse(BaseModel):
+    """
+    Dữ liệu trả về khi đặt lại mật khẩu thất bại.
+    """
+    resetSuccess: bool = Field(False, description="Trạng thái đặt lại mật khẩu thất bại")
+    error_code: str = Field(..., description="Mã lỗi hệ thống")
+    message: str = Field(..., description="Thông điệp lỗi chi tiết")

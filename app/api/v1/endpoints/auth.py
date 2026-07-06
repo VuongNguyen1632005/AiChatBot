@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.postgresql.session import get_db
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from app.schemas.auth import (
     RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData,
-    ForgotPasswordRequest, ForgotPasswordResponse, VerifyOTPRequest, VerifyOTPResponse, VerifyOTPErrorResponse
+    ForgotPasswordRequest, ForgotPasswordResponse, VerifyOTPRequest, VerifyOTPResponse, VerifyOTPErrorResponse,
+    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordErrorResponse
 )
 from app.schemas.common import ApiResponse
 from app.services.auth_service import AuthService
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException
 
 router = APIRouter()
 
@@ -97,6 +99,62 @@ async def verify_otp(request: VerifyOTPRequest):
             status_code=e.status_code,
             content={
                 "verified": False,
+                "error_code": e.error_code,
+                "message": e.message
+            }
+        )
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ResetPasswordErrorResponse, "description": "Token không hợp lệ hoặc hết hạn"},
+        422: {"model": ResetPasswordErrorResponse, "description": "Mật khẩu không khớp hoặc quá yếu"}
+    },
+    summary="Đặt lại mật khẩu mới"
+)
+async def reset_password(
+    request_data: dict = Body(..., example={
+        "resetToken": "reset_token_here",
+        "newPassword": "Password@123",
+        "confirmPassword": "Password@123"
+    }),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Đặt lại mật khẩu mới sau khi xác thực thành công mã OTP ở bước trước.
+    """
+    # 1. Validate bằng Pydantic Schema thủ công để trả về đúng cấu trúc mã lỗi yêu cầu
+    try:
+        request = ResetPasswordRequest(**request_data)
+    except ValidationError as e:
+        for error in e.errors():
+            msg = error.get("msg")
+            # Làm sạch thông báo lỗi của Pydantic custom validators
+            if msg.startswith("Value error, "):
+                msg = msg[len("Value error, "):]
+            
+            # Phân loại mã lỗi
+            error_code = "PASSWORD_MISMATCH" if "không khớp" in msg else "PASSWORD_TOO_WEAK"
+            return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                content={
+                    "resetSuccess": False,
+                    "error_code": error_code,
+                    "message": msg
+                }
+            )
+
+    # 2. Gọi dịch vụ thực hiện logic đặt lại mật khẩu
+    try:
+        response = await AuthService.reset_password(db, request.resetToken, request.newPassword)
+        return response
+    except ResetTokenInvalidException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "resetSuccess": False,
                 "error_code": e.error_code,
                 "message": e.message
             }

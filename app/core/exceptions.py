@@ -27,3 +27,13 @@ class TooManyAttemptsException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
+
+class ResetTokenInvalidException(Exception):
+    status_code = 400
+    error_code = "RESET_TOKEN_INVALID"
+    message = "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"
+
+    def __init__(self, message: str = None):
+        if message:
+            self.message = message
+        super().__init__(self.message)
