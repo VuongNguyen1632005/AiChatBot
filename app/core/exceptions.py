@@ -47,3 +47,13 @@ class VerifyTokenInvalidException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
+
+class ResendCooldownException(Exception):
+    status_code = 429
+    error_code = "RESEND_COOLDOWN"
+    message = "Vui lòng đợi 60 giây trước khi yêu cầu gửi lại"
+
+    def __init__(self, message: str = None):
+        if message:
+            self.message = message
+        super().__init__(self.message)

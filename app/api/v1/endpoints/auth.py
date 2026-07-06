@@ -6,11 +6,12 @@ from pydantic import ValidationError
 from app.schemas.auth import (
     RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData,
     ForgotPasswordRequest, ForgotPasswordResponse, VerifyOTPRequest, VerifyOTPResponse, VerifyOTPErrorResponse,
-    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordErrorResponse, VerifyEmailResponse
+    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordErrorResponse, VerifyEmailResponse,
+    ResendVerificationRequest, ResendVerificationResponse
 )
 from app.schemas.common import ApiResponse
 from app.services.auth_service import AuthService
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException
 
 router = APIRouter()
 
@@ -181,6 +182,33 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
             status_code=e.status_code,
             content={
                 "verified": False,
+                "error_code": e.error_code,
+                "message": e.message
+            }
+        )
+
+@router.post(
+    "/resend-verification",
+    response_model=ResendVerificationResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        429: {"model": ResendVerificationResponse, "description": "Gửi lại quá nhanh, đang trong thời gian cooldown"}
+    },
+    summary="Gửi lại liên kết xác thực email"
+)
+async def resend_verification(request: ResendVerificationRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Gửi lại email xác minh tài khoản nếu liên kết trước đó bị hết hạn hoặc thất lạc.
+    Áp dụng cooldown 60 giây chống spam.
+    """
+    try:
+        response = await AuthService.resend_verification(db, request.email)
+        return response
+    except ResendCooldownException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "resent": False,
                 "error_code": e.error_code,
                 "message": e.message
             }
