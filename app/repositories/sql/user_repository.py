@@ -25,3 +25,21 @@ class UserRepository:
         await db.commit()
         await db.refresh(db_user)
         return db_user
+
+    @staticmethod
+    async def get_by_email(db: AsyncSession, email: str) -> Optional[User]:
+        """
+        Lấy thông tin người dùng dựa trên địa chỉ email.
+        """
+        return await UserRepository.get_user_by_email(db, email)
+
+    @staticmethod
+    async def update_password(db: AsyncSession, email: str, hashed_password: str) -> None:
+        """
+        Cập nhật mật khẩu mới cho người dùng.
+        """
+        user = await UserRepository.get_user_by_email(db, email)
+        if user:
+            user.password_hash = hashed_password
+            db.add(user)
+            await db.commit()
