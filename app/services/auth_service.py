@@ -4,7 +4,7 @@ from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse, VerifyEmailResponse, ResendVerificationResponse
 from app.db.redis.session import get_redis
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException, EmailNotVerifiedException, AccountSuspendedException
 from app.services.email_service import EmailService
 from app.db.mongodb.session import db_mongo
 from app.utils.email_sender import send_otp_email, send_password_changed_email
@@ -93,6 +93,13 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Tài khoản đã bị vô hiệu hóa"
             )
+
+        # [MỚI] Kiểm tra trạng thái tài khoản
+        if user.status == 'SUSPENDED':
+            raise AccountSuspendedException()
+
+        if not user.email_verified:
+            raise EmailNotVerifiedException(email=user.email)
 
         # Chuẩn bị payload để sinh JWT
         token_payload = {
