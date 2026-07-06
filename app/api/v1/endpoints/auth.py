@@ -6,11 +6,11 @@ from pydantic import ValidationError
 from app.schemas.auth import (
     RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData,
     ForgotPasswordRequest, ForgotPasswordResponse, VerifyOTPRequest, VerifyOTPResponse, VerifyOTPErrorResponse,
-    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordErrorResponse
+    ResetPasswordRequest, ResetPasswordResponse, ResetPasswordErrorResponse, VerifyEmailResponse
 )
 from app.schemas.common import ApiResponse
 from app.services.auth_service import AuthService
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException
 
 router = APIRouter()
 
@@ -155,6 +155,32 @@ async def reset_password(
             status_code=e.status_code,
             content={
                 "resetSuccess": False,
+                "error_code": e.error_code,
+                "message": e.message
+            }
+        )
+
+@router.get(
+    "/verify-email",
+    response_model=VerifyEmailResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": VerifyEmailResponse, "description": "Token xác thực không hợp lệ hoặc đã hết hạn"}
+    },
+    summary="Xác thực email đăng ký tài khoản"
+)
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    Xác thực email người dùng thông qua mã token được gửi qua email.
+    """
+    try:
+        response = await AuthService.verify_email(db, token)
+        return response
+    except VerifyTokenInvalidException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "verified": False,
                 "error_code": e.error_code,
                 "message": e.message
             }

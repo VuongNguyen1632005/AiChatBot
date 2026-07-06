@@ -43,3 +43,24 @@ class UserRepository:
             user.password_hash = hashed_password
             db.add(user)
             await db.commit()
+
+    @staticmethod
+    async def get_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+        """
+        Lấy thông tin người dùng theo ID.
+        """
+        result = await db.execute(select(User).filter(User.id == user_id))
+        return result.scalars().first()
+
+    @staticmethod
+    async def activate_user(db: AsyncSession, user_id: int) -> None:
+        """
+        Kích hoạt tài khoản người dùng: set email_verified=True, status='ACTIVE'.
+        """
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalars().first()
+        if user:
+            user.email_verified = True
+            user.status = "ACTIVE"
+            db.add(user)
+            await db.commit()

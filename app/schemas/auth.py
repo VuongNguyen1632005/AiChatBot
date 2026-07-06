@@ -134,3 +134,10 @@ class ResetPasswordErrorResponse(BaseModel):
     resetSuccess: bool = Field(False, description="Trạng thái đặt lại mật khẩu thất bại")
     error_code: str = Field(..., description="Mã lỗi hệ thống")
     message: str = Field(..., description="Thông điệp lỗi chi tiết")
+
+class VerifyEmailResponse(BaseModel):
+    """
+    Dữ liệu trả về khi xác thực email.
+    """
+    verified: bool = Field(..., description="Trạng thái xác thực email thành công hay thất bại")
+    message: str = Field(..., description="Thông báo kết quả chi tiết")

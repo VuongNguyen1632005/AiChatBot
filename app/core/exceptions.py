@@ -37,3 +37,13 @@ class ResetTokenInvalidException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
+
+class VerifyTokenInvalidException(Exception):
+    status_code = 400
+    error_code = "VERIFY_TOKEN_INVALID"
+    message = "Liên kết xác thực không hợp lệ hoặc đã hết hạn"
+
+    def __init__(self, message: str = None):
+        if message:
+            self.message = message
+        super().__init__(self.message)

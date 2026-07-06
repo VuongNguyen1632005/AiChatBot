@@ -2,9 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse
+from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse, VerifyEmailResponse
 from app.db.redis.session import get_redis
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException
 from app.db.mongodb.session import db_mongo
 from app.utils.email_sender import send_otp_email, send_password_changed_email
 import secrets
@@ -262,4 +262,60 @@ class AuthService:
 
         return ResetPasswordResponse(
             resetSuccess=True
+        )
+
+    @staticmethod
+    async def verify_email(db: AsyncSession, token: str) -> VerifyEmailResponse:
+        """
+        Xác thực tài khoản qua link email:
+        1. Lấy user_id từ Redis theo key: email_verify:{token}.
+        2. Không tồn tại -> raise VerifyTokenInvalidException().
+        3. Tìm user trong Postgres. Không thấy -> raise VerifyTokenInvalidException().
+        4. Nếu đã xác thực trước đó (email_verified=True) -> Trả thành công (Idempotent).
+        5. Nếu chưa -> Cập nhật email_verified=True, status='ACTIVE', xóa token Redis.
+        """
+        redis_cli = await get_redis()
+        if not redis_cli:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Dịch vụ Redis không hoạt động"
+            )
+
+        verify_key = f"email_verify:{token}"
+
+        # 1. Lấy user_id từ Redis
+        user_id_str = await redis_cli.get(verify_key)
+        if not user_id_str:
+            raise VerifyTokenInvalidException()
+
+        user_id = int(user_id_str)
+
+        # 2. Tìm user trong PostgreSQL
+        user = await UserRepository.get_by_id(db, user_id)
+        if not user:
+            raise VerifyTokenInvalidException()
+
+        # 3. Xử lý tính lũy đẳng (Idempotency)
+        if user.email_verified:
+            return VerifyEmailResponse(
+                verified=True,
+                message="Email đã được xác thực trước đó"
+            )
+
+        # 4. Kích hoạt tài khoản người dùng
+        try:
+            await UserRepository.activate_user(db, user_id)
+        except Exception as e:
+            print(f"❌ Lỗi kích hoạt tài khoản trong PostgreSQL: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Lỗi cập nhật cơ sở dữ liệu"
+            )
+
+        # 5. Xóa token khỏi Redis ngay lập tức (One-time use)
+        await redis_cli.delete(verify_key)
+
+        return VerifyEmailResponse(
+            verified=True,
+            message="Xác thực email thành công"
         )
