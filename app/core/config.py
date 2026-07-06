@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     GEMINI_API_KEY: str = ""
     
+    # SMTP Mail Config
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_SERVER: str = ""
+    MAIL_PORT: int = 587
+    
     # Auth & Security
     SECRET_KEY: str = "supersecretkeychangeinproduction"
     ALGORITHM: str = "HS256"
