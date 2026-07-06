@@ -2,8 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse
+from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse
 from app.db.redis.session import get_redis
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException
 from app.db.mongodb.session import db_mongo
 from app.utils.email_sender import send_otp_email
 import secrets
@@ -143,4 +144,63 @@ class AuthService:
             email=email,
             otpSent=True,
             expiredIn=300
+        )
+
+    @staticmethod
+    async def verify_otp(email: str, otp: str) -> VerifyOTPResponse:
+        """
+        Xác thực OTP:
+        1. Kiểm tra số lần thử sai (rate limit 5 lần).
+        2. Lấy OTP từ Redis.
+        3. So sánh OTP an toàn bằng secrets.compare_digest().
+        4. Đúng: xóa OTP, xóa attempts key, tạo và lưu resetToken (10 phút), trả về token.
+        5. Sai: tăng số lần thử sai, raise exception tương ứng.
+        """
+        redis_cli = await get_redis()
+        if not redis_cli:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Dịch vụ Redis không hoạt động"
+            )
+
+        attempts_key = f"otp_attempts:{email}"
+        otp_key = f"otp:forgot_password:{email}"
+
+        # 1. Kiểm tra giới hạn số lần thử sai (Rate limit)
+        attempts = await redis_cli.get(attempts_key)
+        if attempts is not None and int(attempts) >= 5:
+            raise TooManyAttemptsException()
+
+        # 2. Lấy OTP đã lưu từ Redis
+        saved_otp = await redis_cli.get(otp_key)
+        if not saved_otp:
+            raise OTPExpiredException()
+
+        # 3. So sánh OTP bảo mật để tránh Timing Attack
+        if not secrets.compare_digest(saved_otp, otp):
+            # Tăng số lần thử sai lên 1
+            new_attempts = await redis_cli.incr(attempts_key)
+            if new_attempts == 1:
+                await redis_cli.expire(attempts_key, 300)
+
+            if new_attempts >= 5:
+                raise TooManyAttemptsException()
+            raise OTPInvalidException()
+
+        # 4. Khi OTP đúng:
+        # Xóa OTP khỏi Redis (One-time use)
+        await redis_cli.delete(otp_key)
+        # Reset số lần thử sai
+        await redis_cli.delete(attempts_key)
+
+        # Tạo resetToken bảo mật cao
+        reset_token = secrets.token_urlsafe(32)
+        reset_token_key = f"reset_token:{reset_token}"
+
+        # Lưu resetToken vào Redis (TTL 600 giây - 10 phút)
+        await redis_cli.setex(reset_token_key, 600, email)
+
+        return VerifyOTPResponse(
+            verified=True,
+            resetToken=reset_token
         )

@@ -64,3 +64,31 @@ class ForgotPasswordResponse(BaseModel):
     email: EmailStr = Field(..., description="Email nhận mã OTP")
     otpSent: bool = Field(..., description="Trạng thái đã gửi OTP")
     expiredIn: int = Field(..., description="Thời gian hết hạn của OTP tính bằng giây (ví dụ: 300)")
+
+class VerifyOTPRequest(BaseModel):
+    """
+    Schema yêu cầu xác thực OTP.
+    """
+    email: EmailStr = Field(..., description="Email của tài khoản cần xác thực OTP")
+    otp: str = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        pattern=r"^\d{6}$",
+        description="Mã OTP gồm 6 chữ số"
+    )
+
+class VerifyOTPResponse(BaseModel):
+    """
+    Dữ liệu trả về khi xác thực OTP thành công.
+    """
+    verified: bool = Field(..., description="Trạng thái xác thực thành công")
+    resetToken: Optional[str] = Field(None, description="Token dùng để đặt lại mật khẩu")
+
+class VerifyOTPErrorResponse(BaseModel):
+    """
+    Dữ liệu trả về khi xác thực OTP thất bại.
+    """
+    verified: bool = Field(False, description="Trạng thái xác thực thất bại")
+    error_code: str = Field(..., description="Mã lỗi xác thực")
+    message: str = Field(..., description="Thông điệp chi tiết lỗi")
