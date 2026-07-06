@@ -39,11 +39,31 @@ class AuthService:
             "gender": request.gender,
             "password_hash": hash_password(request.password),
             "role": "TEACHER",  # Vai trò mặc định cho tài khoản đăng ký mới
-            "is_active": True
+            "is_active": True,
+            "email_verified": False,
+            "status": "PENDING"
         }
 
         # Lưu vào cơ sở dữ liệu
         new_user = await UserRepository.create_user(db, user_data)
+
+        # Logic bổ sung: Sinh verify_token và gửi email xác thực tài khoản
+        try:
+            verify_token = secrets.token_urlsafe(32)
+            verify_key = f"email_verify:{verify_token}"
+
+            # Lưu token vào Redis với TTL 24 giờ (86400 giây)
+            redis_cli = await get_redis()
+            if redis_cli:
+                await redis_cli.setex(verify_key, 86400, str(new_user.id))
+
+                # Gửi email chứa link xác thực
+                await EmailService.send_verify_email(new_user.email, verify_token)
+            else:
+                print("⚠️ Không thể kết nối Redis để lưu email verification token")
+        except Exception as e:
+            # Ghi nhận log lỗi gửi email nhưng KHÔNG làm gián đoạn luồng đăng ký
+            print(f"⚠️ Lỗi trong quá trình tạo verify token hoặc gửi email xác thực: {e}")
 
         return RegisterResponseData(
             userId=new_user.id,

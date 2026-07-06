@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     MONGODB_URL: str = "mongodb://localhost:27017"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/my_database"
     REDIS_URL: str = "redis://localhost:6379/0"
+    FRONTEND_URL: str = "http://localhost:3000"
     GEMINI_API_KEY: str = ""
     
     # SMTP Mail Config
