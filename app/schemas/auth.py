@@ -141,3 +141,16 @@ class VerifyEmailResponse(BaseModel):
     """
     verified: bool = Field(..., description="Trạng thái xác thực email thành công hay thất bại")
     message: str = Field(..., description="Thông báo kết quả chi tiết")
+
+class ResendVerificationRequest(BaseModel):
+    """
+    Schema yêu cầu gửi lại email xác thực.
+    """
+    email: EmailStr = Field(..., description="Email cần nhận lại liên kết xác thực")
+
+class ResendVerificationResponse(BaseModel):
+    """
+    Dữ liệu trả về khi gửi lại email xác thực thành công.
+    """
+    resent: bool = Field(..., description="Trạng thái gửi lại email xác thực")
+    message: str = Field(..., description="Thông điệp kết quả gửi lại")

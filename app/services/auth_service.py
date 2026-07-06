@@ -2,9 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
-from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse, VerifyEmailResponse
+from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse, VerifyEmailResponse, ResendVerificationResponse
 from app.db.redis.session import get_redis
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException
+from app.services.email_service import EmailService
 from app.db.mongodb.session import db_mongo
 from app.utils.email_sender import send_otp_email, send_password_changed_email
 import secrets
@@ -318,4 +319,61 @@ class AuthService:
         return VerifyEmailResponse(
             verified=True,
             message="Xác thực email thành công"
+        )
+
+    @staticmethod
+    async def resend_verification(db: AsyncSession, email: str) -> ResendVerificationResponse:
+        """
+        Gửi lại email xác thực:
+        1. Tìm user theo email. Không tồn tại -> Trả về 200 giả (Tránh lộ email tồn tại).
+        2. Nếu user đã được xác thực -> Trả về thông báo đã xác thực.
+        3. Kiểm tra cooldown: resend_verify_cooldown:{email}. Nếu còn -> raise ResendCooldownException().
+        4. Sinh token mới, lưu vào Redis email_verify:{token} (24h).
+        5. Đặt cooldown 60 giây.
+        6. Gửi email xác thực mới qua EmailService.
+        """
+        redis_cli = await get_redis()
+        if not redis_cli:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Dịch vụ Redis không hoạt động"
+            )
+
+        # 1. Tìm user theo email
+        user = await UserRepository.get_by_email(db, email)
+        if not user:
+            # TODO: Giới hạn số lần resend tối đa trong ngày/email (VD: max 5 lần)
+            # Trả về 200 giả lập để bảo mật thông tin tài khoản
+            return ResendVerificationResponse(
+                resent=True,
+                message="Email xác thực đã được gửi lại, vui lòng kiểm tra hộp thư"
+            )
+
+        # 2. Kiểm tra nếu tài khoản đã xác thực rồi
+        if user.email_verified:
+            return ResendVerificationResponse(
+                resent=False,
+                message="Email này đã được xác thực trước đó"
+            )
+
+        # 3. Kiểm tra cooldown chống spam gửi liên tục (60 giây)
+        cooldown_key = f"resend_verify_cooldown:{email}"
+        cooldown = await redis_cli.get(cooldown_key)
+        if cooldown:
+            raise ResendCooldownException()
+
+        # 4. Sinh token mới và lưu vào Redis (TTL 24h)
+        verify_token = secrets.token_urlsafe(32)
+        verify_key = f"email_verify:{verify_token}"
+        await redis_cli.setex(verify_key, 86400, user.id)
+
+        # 5. Lưu cooldown vào Redis (TTL 60s)
+        await redis_cli.setex(cooldown_key, 60, "1")
+
+        # 6. Gửi email xác thực chứa token mới
+        await EmailService.send_verify_email(email, verify_token)
+
+        return ResendVerificationResponse(
+            resent=True,
+            message="Email xác thực đã được gửi lại, vui lòng kiểm tra hộp thư"
         )
