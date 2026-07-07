@@ -64,3 +64,11 @@ class UserRepository:
             user.status = "ACTIVE"
             db.add(user)
             await db.commit()
+
+    @staticmethod
+    async def get_by_phone(db: AsyncSession, phone: str) -> Optional[User]:
+        """
+        Lấy thông tin người dùng dựa trên số điện thoại.
+        """
+        result = await db.execute(select(User).filter(User.phone == phone))
+        return result.scalars().first()

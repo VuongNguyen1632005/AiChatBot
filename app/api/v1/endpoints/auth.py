@@ -11,7 +11,11 @@ from app.schemas.auth import (
 )
 from app.schemas.common import ApiResponse
 from app.services.auth_service import AuthService
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException
+from app.core.exceptions import (
+    OTPInvalidException, OTPExpiredException, TooManyAttemptsException,
+    ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException,
+    EmailNotVerifiedException, AccountSuspendedException, PhoneAlreadyExistsException
+)
 
 router = APIRouter()
 
@@ -26,13 +30,22 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     Đăng ký tài khoản giáo viên mới trên hệ thống ETECHS.
     Các trường thông tin bắt buộc gồm email, fullName, password, confirmPassword.
     """
-    data = await AuthService.register(db, request)
-    return ApiResponse(
-        success=True,
-        message="Thao tác thành công",
-        data=data,
-        errors=None
-    )
+    try:
+        data = await AuthService.register(db, request)
+        return ApiResponse(
+            success=True,
+            message="Thao tác thành công",
+            data=data,
+            errors=None
+        )
+    except PhoneAlreadyExistsException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "error_code": e.error_code,
+                "message": e.message
+            }
+        )
 
 @router.post(
     "/login",
