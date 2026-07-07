@@ -58,7 +58,6 @@ class ResendCooldownException(Exception):
             self.message = message
         super().__init__(self.message)
 
-
 class EmailNotVerifiedException(Exception):
     status_code = 403
     error_code = "EMAIL_NOT_VERIFIED"
@@ -81,3 +80,12 @@ class AccountSuspendedException(Exception):
             self.message = message
         super().__init__(self.message)
 
+class PhoneAlreadyExistsException(Exception):
+    status_code = 400
+    error_code = "PHONE_ALREADY_EXISTS"
+    message = "Số điện thoại đã được đăng ký"
+
+    def __init__(self, message: str = None):
+        if message:
+            self.message = message
+        super().__init__(self.message)

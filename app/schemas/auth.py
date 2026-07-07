@@ -5,12 +5,55 @@ class RegisterRequest(BaseModel):
     """
     Schema yêu cầu đăng ký người dùng mới.
     """
-    fullName: str = Field(..., min_length=1, description="Họ và tên của người dùng")
+    fullName: str = Field(..., description="Họ và tên của người dùng")
     email: EmailStr = Field(..., description="Email đăng ký tài khoản")
-    phone: Optional[str] = Field(None, description="Số điện thoại")
+    phone: str = Field(..., description="Số điện thoại")
     gender: Optional[str] = Field(None, description="Giới tính")
-    password: str = Field(..., min_length=6, description="Mật khẩu (tối thiểu 6 ký tự)")
-    confirmPassword: str = Field(..., min_length=6, description="Mật khẩu xác nhận lại")
+    password: str = Field(..., description="Mật khẩu (từ 8 đến 64 ký tự)")
+    confirmPassword: str = Field(..., description="Mật khẩu xác nhận lại")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        import re
+        if not re.match(r"^\d+$", v):
+            raise ValueError("Số điện thoại chỉ được chứa chữ số")
+        if len(v) != 10:
+            raise ValueError("Số điện thoại phải có đúng 10 chữ số")
+        return v
+
+    @field_validator("fullName")
+    @classmethod
+    def validate_full_name(cls, v: str) -> str:
+        # 1. Loại bỏ khoảng trắng 2 đầu
+        v_stripped = v.strip()
+        
+        # 2. Kiểm tra chỉ toàn khoảng trắng
+        if not v_stripped:
+            raise ValueError("Họ và tên không được để trống")
+            
+        # 3. Kiểm tra độ dài từ 2 đến 100 ký tự (sau khi strip)
+        if len(v_stripped) < 2:
+            raise ValueError("Họ và tên phải có ít nhất 2 ký tự")
+        if len(v_stripped) > 100:
+            raise ValueError("Họ và tên không được vượt quá 100 ký tự")
+            
+        # 4 & 5. Chỉ cho phép chữ cái (kể cả tiếng Việt có dấu) và khoảng trắng
+        if not all(c.isalpha() or c.isspace() for c in v_stripped):
+            raise ValueError("Họ và tên không được chứa số hoặc ký tự đặc biệt")
+            
+        # 6. Trả về giá trị đã strip
+        return v_stripped
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        # Theo đặc tả: chỉ khuyến nghị, không bắt buộc chữ hoa/số/ký tự đặc biệt
+        if len(v) < 8:
+            raise ValueError("Mật khẩu phải có ít nhất 8 ký tự")
+        if len(v) > 64:
+            raise ValueError("Mật khẩu không được vượt quá 64 ký tự")
+        return v
 
     @field_validator("confirmPassword")
     @classmethod

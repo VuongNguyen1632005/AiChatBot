@@ -4,7 +4,7 @@ from app.repositories.sql.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.schemas.auth import RegisterRequest, RegisterResponseData, LoginRequest, LoginResponseData, LoginResponseUser, ForgotPasswordResponse, VerifyOTPResponse, ResetPasswordResponse, VerifyEmailResponse, ResendVerificationResponse
 from app.db.redis.session import get_redis
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException, EmailNotVerifiedException, AccountSuspendedException
+from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException, EmailNotVerifiedException, AccountSuspendedException, PhoneAlreadyExistsException
 from app.services.email_service import EmailService
 from app.db.mongodb.session import db_mongo
 from app.utils.email_sender import send_otp_email, send_password_changed_email
@@ -30,6 +30,11 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=[{"field": "email", "message": "Email đã tồn tại"}]
             )
+
+        # [MỚI] Check phone unique trước khi tạo user
+        existing_phone = await UserRepository.get_by_phone(db, request.phone)
+        if existing_phone:
+            raise PhoneAlreadyExistsException()
 
         # Tạo dict dữ liệu người dùng mới
         user_data = {

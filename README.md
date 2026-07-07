@@ -2,6 +2,8 @@
 
 Backend API được viết bằng **FastAPI** và **Python 3.11+** dành cho dự án **AI Chatbot sinh đề thi thông minh**. Hệ thống hỗ trợ RAG (Retrieval-Augmented Generation) từ tài liệu và kết nối đa cơ sở dữ liệu (PostgreSQL & MongoDB).
 
+👉 **[HƯỚNG DẪN KHỞI CHẠY CHI TIẾT TỪ A-Z (RUN_GUIDE.md)](RUN_GUIDE.md)**
+
 ---
 
 ## 🚀 Tính năng chính
@@ -71,5 +73,6 @@ AiChatbotBackend/
 ---
 
 ## 📖 Tài liệu hướng dẫn lập trình viên khác
-Để xem hướng dẫn chi tiết về cách cài đặt môi trường phát triển cục bộ (Local), cấu hình cơ sở dữ liệu, chạy lệnh migration và xử lý lỗi thường gặp, vui lòng tham khảo:
+Để xem hướng dẫn chi tiết từ lúc clone dự án hoặc các thiết lập môi trường phát triển cục bộ (Local), cấu hình cơ sở dữ liệu, chạy lệnh migration và xử lý lỗi thường gặp, vui lòng tham khảo:
+👉 **[Hướng dẫn khởi chạy chi tiết từ A-Z (RUN_GUIDE.md)](RUN_GUIDE.md)**
 👉 **[Hướng dẫn cài đặt nhanh cho lập trình viên (setup-guide.md)](file:///d:/Thuc_Tap/Ai_chatbot/AiChatbotBackend/docs/setup-guide.md)**
