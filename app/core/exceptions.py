@@ -57,6 +57,7 @@ class ResendCooldownException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
+
 class EmailNotVerifiedException(Exception):
     status_code = 403
     error_code = "EMAIL_NOT_VERIFIED"
@@ -78,7 +79,6 @@ class AccountSuspendedException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
-
 
 class PhoneAlreadyExistsException(Exception):
     status_code = 400

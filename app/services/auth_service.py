@@ -99,6 +99,13 @@ class AuthService:
                 detail="Tài khoản đã bị vô hiệu hóa"
             )
 
+        # [MỚI] Kiểm tra trạng thái tài khoản
+        if user.status == 'SUSPENDED':
+            raise AccountSuspendedException()
+
+        if not user.email_verified:
+            raise EmailNotVerifiedException(email=user.email)
+
         # Chuẩn bị payload để sinh JWT
         token_payload = {
             "sub": str(user.id),

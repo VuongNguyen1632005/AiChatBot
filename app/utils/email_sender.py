@@ -1,85 +1,33 @@
-import smtplib
-import asyncio
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from app.core.config import settings
+from app.services.email_service import EmailService
 
 async def send_otp_email(email: str, otp: str) -> None:
     """
-    Gửi email chứa OTP cho người dùng qua SMTP sử dụng smtplib (non-blocking).
+    Chuyển tiếp việc gửi OTP email sang EmailService sử dụng fastapi-mail.
     """
-    # Nếu không cấu hình SMTP trong file .env, ta sẽ giả lập (mock) ghi vào console để hỗ trợ dev
-    if not all([settings.MAIL_SERVER, settings.MAIL_USERNAME, settings.MAIL_PASSWORD]):
-        print(f"\n==========================================")
-        print(f"📧 [EMAIL MOCK] Gửi OTP '{otp}' đến {email}")
-        print(f"==========================================\n")
-        return
-
-    def _send():
-        msg = MIMEMultipart()
-        msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
-        msg["To"] = email
-        msg["Subject"] = "Mã OTP đặt lại mật khẩu"
-        
-        body = f"""Chào bạn,
-
-Mã OTP để đặt lại mật khẩu của bạn là: {otp}
-
-Mã này có hiệu lực trong vòng 5 phút (300 giây). Vui lòng không chia sẻ mã này với bất kỳ ai.
-
-Trân trọng,
-Đội ngũ phát triển.
-"""
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        
-        # Tạo kết nối SMTP
-        server = smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT)
-        try:
-            server.starttls()
-            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            server.sendmail(msg["From"], email, msg.as_string())
-        finally:
-            server.quit()
-
-    # Thực thi đồng bộ _send trong một worker thread để không block event loop của FastAPI
-    await asyncio.to_thread(_send)
+    await EmailService.send_otp_email(email, otp)
 
 
 async def send_password_changed_email(email: str) -> None:
     """
-    Gửi email thông báo đổi mật khẩu thành công (non-blocking).
+    Gửi email thông báo đổi mật khẩu thành công qua EmailService.
     """
-    if not all([settings.MAIL_SERVER, settings.MAIL_USERNAME, settings.MAIL_PASSWORD]):
-        print(f"\n==========================================")
-        print(f"📧 [EMAIL MOCK] Thông báo đổi mật khẩu thành công gửi đến {email}")
-        print(f"==========================================\n")
-        return
-
-    def _send():
-        msg = MIMEMultipart()
-        msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
-        msg["To"] = email
-        msg["Subject"] = "Thông báo: Mật khẩu của bạn đã được thay đổi"
-        
-        body = f"""Chào bạn,
-
-Mật khẩu cho tài khoản {email} của bạn vừa được thay đổi thành công.
-
-Nếu không phải bạn thực hiện thay đổi này, vui lòng liên hệ ngay với chúng tôi để bảo vệ tài khoản.
-
-Trân trọng,
-Đội ngũ phát triển.
-"""
-        msg.attach(MIMEText(body, "plain", "utf-8"))
-        
-        # Tạo kết nối SMTP
-        server = smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT)
-        try:
-            server.starttls()
-            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            server.sendmail(msg["From"], email, msg.as_string())
-        finally:
-            server.quit()
-
-    # Thực thi đồng bộ _send trong một worker thread để không block event loop của FastAPI
-    await asyncio.to_thread(_send)
+    subject = "Thông báo: Mật khẩu của bạn đã được thay đổi - Học Tập Tin Học"
+    html_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px; margin: 0;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <h2 style="color: #333333; text-align: center; margin-top: 0;">Thay Đổi Mật Khẩu Thành Công</h2>
+                <p style="color: #555555; font-size: 16px; line-height: 1.5;">Chào bạn,</p>
+                <p style="color: #555555; font-size: 16px; line-height: 1.5;">Mật khẩu cho tài khoản <strong>{email}</strong> của bạn vừa được thay đổi thành công.</p>
+                <p style="color: #ff5722; font-size: 14px; font-weight: bold; margin-bottom: 20px;">
+                    ⚠️ Nếu không phải bạn thực hiện thay đổi này, vui lòng liên hệ ngay với chúng tôi để bảo vệ tài khoản.
+                </p>
+                <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 30px 0;">
+                <p style="color: #888888; font-size: 12px; text-align: center; margin-bottom: 0;">
+                    Học Tập Tin Học
+                </p>
+            </div>
+        </body>
+    </html>
+    """
+    await EmailService._send(email, subject, html_body)
