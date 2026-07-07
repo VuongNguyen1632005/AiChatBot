@@ -57,3 +57,27 @@ class ResendCooldownException(Exception):
         if message:
             self.message = message
         super().__init__(self.message)
+
+
+class EmailNotVerifiedException(Exception):
+    status_code = 403
+    error_code = "EMAIL_NOT_VERIFIED"
+    message = "Vui lòng xác thực email trước khi đăng nhập"
+
+    def __init__(self, email: str, message: str = None):
+        self.email = email
+        if message:
+            self.message = message
+        super().__init__(self.message)
+
+
+class AccountSuspendedException(Exception):
+    status_code = 403
+    error_code = "ACCOUNT_SUSPENDED"
+    message = "Tài khoản của bạn đã bị khóa, vui lòng liên hệ hỗ trợ"
+
+    def __init__(self, message: str = None):
+        if message:
+            self.message = message
+        super().__init__(self.message)
+

@@ -11,7 +11,11 @@ from app.schemas.auth import (
 )
 from app.schemas.common import ApiResponse
 from app.services.auth_service import AuthService
-from app.core.exceptions import OTPInvalidException, OTPExpiredException, TooManyAttemptsException, ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException
+from app.core.exceptions import (
+    OTPInvalidException, OTPExpiredException, TooManyAttemptsException,
+    ResetTokenInvalidException, VerifyTokenInvalidException, ResendCooldownException,
+    EmailNotVerifiedException, AccountSuspendedException
+)
 
 router = APIRouter()
 
@@ -44,13 +48,31 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Đăng nhập bằng Email và Mật khẩu để nhận JWT Access Token và Refresh Token.
     """
-    data = await AuthService.login(db, request)
-    return ApiResponse(
-        success=True,
-        message="Thao tác thành công",
-        data=data,
-        errors=None
-    )
+    try:
+        data = await AuthService.login(db, request)
+        return ApiResponse(
+            success=True,
+            message="Thao tác thành công",
+            data=data,
+            errors=None
+        )
+    except AccountSuspendedException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "error_code": e.error_code,
+                "message": e.message
+            }
+        )
+    except EmailNotVerifiedException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "error_code": e.error_code,
+                "message": e.message,
+                "email": e.email
+            }
+        )
 
 @router.post(
     "/forgot-password",

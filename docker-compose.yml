@@ -29,6 +29,7 @@ services:
 
   web:
     build: .
+    image: iuikui/aichatbot-backend:latest
     container_name: fastapi_web
     ports:
       - "8000:8000"
