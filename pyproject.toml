@@ -39,6 +39,7 @@ dependencies = [
     "python-slugify>=8.0.0",
     "aioodbc>=0.5.0",
     "pyodbc>=5.3.0",
+    "fastapi-mail>=1.4.0",
 ]
 
 [project.optional-dependencies]
